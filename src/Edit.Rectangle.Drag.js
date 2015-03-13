@@ -32,6 +32,11 @@ L.Edit.Rectangle.include( /** @lends L.Edit.Rectangle.prototype */ {
   /**
    * @override
    */
+  _createMoveMarker: L.Edit.SimpleShape.prototype._createMoveMarker,
+
+  /**
+   * @override
+   */
   _resize: function(latlng) {
     // Update the shape based on the current position of
     // this corner and the opposite point
