@@ -152,7 +152,9 @@ L.Handler.PathDrag = L.Handler.extend( /** @lends  L.Path.Drag.prototype */ {
    */
   addHooks: function() {
     this._path.on('mousedown', this._onDragStart, this);
-    L.DomUtil.addClass(this._path._container, 'leaflet-path-draggable');
+    if (!L.Path.CANVAS) {
+      L.DomUtil.addClass(this._path._container, 'leaflet-path-draggable');
+    }
   },
 
   /**
@@ -160,7 +162,9 @@ L.Handler.PathDrag = L.Handler.extend( /** @lends  L.Path.Drag.prototype */ {
    */
   removeHooks: function() {
     this._path.off('mousedown', this._onDragStart, this);
-    L.DomUtil.removeClass(this._path._container, 'leaflet-path-draggable');
+    if (!L.Path.CANVAS) {
+      L.DomUtil.removeClass(this._path._container, 'leaflet-path-draggable');
+    }
   },
 
   /**
@@ -199,6 +203,11 @@ L.Handler.PathDrag = L.Handler.extend( /** @lends  L.Path.Drag.prototype */ {
     if (!this._path._dragMoved && (dx || dy)) {
       this._path._dragMoved = true;
       this._path.fire('dragstart');
+
+      if (this._path._popup) {
+        this._path._popup._close();
+        this._path.off('click', this._path._openPopup, this._path);
+      }
     }
 
     this._matrix[4] += dx;
@@ -233,6 +242,12 @@ L.Handler.PathDrag = L.Handler.extend( /** @lends  L.Path.Drag.prototype */ {
         L.LineUtil._sqDist(this._dragStartPoint, evt.containerPoint)
       )
     });
+
+    if (this._path._popup) {
+      L.Util.requestAnimFrame(function() {
+        this._path.on('click', this._path._openPopup, this._path);
+      }, this);
+    }
 
     this._matrix = null;
     this._startPoint = null;
@@ -576,16 +591,18 @@ L.Edit.Circle.include( /** @lends L.Edit.Circle.prototype */ {
    * Dragging stopped, apply
    * @param  {L.MouseEvent} evt
    */
-  _onStopDragFeature: function() {
-    var center = this._shape.getLatLng();
+  _onStopDragFeature: function(evt) {
+    if (evt.distance > 0) {
+      var center = this._shape.getLatLng();
 
-    //this._moveMarker.setLatLng(center);
-    this._resizeMarkers[0].setLatLng(this._getResizeMarkerPoint(center));
+      //this._moveMarker.setLatLng(center);
+      this._resizeMarkers[0].setLatLng(this._getResizeMarkerPoint(center));
 
-    // show resize marker
-    this._shape._map.addLayer(this._markerGroup);
-    this._updateMoveMarker();
-    this._fireEdit();
+      // show resize marker
+      this._shape._map.addLayer(this._markerGroup);
+      this._updateMoveMarker();
+      this._fireEdit();
+    }
   }
 });
 /**
@@ -675,30 +692,33 @@ L.Edit.Rectangle.include( /** @lends L.Edit.Rectangle.prototype */ {
    * Dragging stopped, apply
    * @param  {L.MouseEvent} evt
    */
-  _onStopDragFeature: function() {
+  _onStopDragFeature: function(evt) {
     var polygon = this._shape;
-    for (var i = 0, len = polygon._latlngs.length; i < len; i++) {
-      // update marker
-      var marker = this._resizeMarkers[i];
-      marker.setLatLng(polygon._latlngs[i]);
 
-      // this one's needed to update the path
-      marker._origLatLng = polygon._latlngs[i];
-      if (marker._middleLeft) {
-        marker._middleLeft.setLatLng(this._getMiddleLatLng(marker._prev, marker));
+    if (evt.distance > 0) {
+      for (var i = 0, len = polygon._latlngs.length; i < len; i++) {
+        // update marker
+        var marker = this._resizeMarkers[i];
+        marker.setLatLng(polygon._latlngs[i]);
+
+        // this one's needed to update the path
+        marker._origLatLng = polygon._latlngs[i];
+        if (marker._middleLeft) {
+          marker._middleLeft.setLatLng(this._getMiddleLatLng(marker._prev, marker));
+        }
+        if (marker._middleRight) {
+          marker._middleRight.setLatLng(this._getMiddleLatLng(marker, marker._next));
+        }
       }
-      if (marker._middleRight) {
-        marker._middleRight.setLatLng(this._getMiddleLatLng(marker, marker._next));
-      }
+      // this._moveMarker.setLatLng(polygon.getBounds().getCenter());
+
+      // show vertices
+      this._shape._map.addLayer(this._markerGroup);
+      this._updateMoveMarker();
+
+      this._repositionCornerMarkers();
+      this._fireEdit();
     }
-    // this._moveMarker.setLatLng(polygon.getBounds().getCenter());
-
-    // show vertices
-    this._shape._map.addLayer(this._markerGroup);
-    this._updateMoveMarker();
-
-    this._repositionCornerMarkers();
-    this._fireEdit();
   }
 });
 /**
@@ -810,25 +830,28 @@ L.Edit.Poly.include( /** @lends L.Edit.Poly.prototype */ {
    */
   _onStopDragFeature: function(evt) {
     var polygon = this._poly;
-    for (var i = 0, len = polygon._latlngs.length; i < len; i++) {
-      // update marker
-      var marker = this._markers[i];
-      marker.setLatLng(polygon._latlngs[i]);
 
-      // this one's needed to update the path
-      marker._origLatLng = polygon._latlngs[i];
-      if (marker._middleLeft) {
-        marker._middleLeft.setLatLng(this._getMiddleLatLng(marker._prev, marker));
+    if (evt.distance > 0) {
+      for (var i = 0, len = polygon._latlngs.length; i < len; i++) {
+        // update marker
+        var marker = this._markers[i];
+        marker.setLatLng(polygon._latlngs[i]);
+
+        // this one's needed to update the path
+        marker._origLatLng = polygon._latlngs[i];
+        if (marker._middleLeft) {
+          marker._middleLeft.setLatLng(this._getMiddleLatLng(marker._prev, marker));
+        }
+        if (marker._middleRight) {
+          marker._middleRight.setLatLng(this._getMiddleLatLng(marker, marker._next));
+        }
       }
-      if (marker._middleRight) {
-        marker._middleRight.setLatLng(this._getMiddleLatLng(marker, marker._next));
-      }
+
+      // show vertices
+      this._poly._map.addLayer(this._markerGroup);
+      L.Edit.SimpleShape.prototype._updateMoveMarker.call(this);
+      this._fireEdit();
     }
-
-    // show vertices
-    this._poly._map.addLayer(this._markerGroup);
-    L.Edit.SimpleShape.prototype._updateMoveMarker.call(this);
-    this._fireEdit();
   },
 
   /**

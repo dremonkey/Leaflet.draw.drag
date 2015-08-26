@@ -90,15 +90,17 @@ L.Edit.Circle.include( /** @lends L.Edit.Circle.prototype */ {
    * Dragging stopped, apply
    * @param  {L.MouseEvent} evt
    */
-  _onStopDragFeature: function() {
-    var center = this._shape.getLatLng();
+  _onStopDragFeature: function(evt) {
+    if (evt.distance > 0) {
+      var center = this._shape.getLatLng();
 
-    //this._moveMarker.setLatLng(center);
-    this._resizeMarkers[0].setLatLng(this._getResizeMarkerPoint(center));
+      //this._moveMarker.setLatLng(center);
+      this._resizeMarkers[0].setLatLng(this._getResizeMarkerPoint(center));
 
-    // show resize marker
-    this._shape._map.addLayer(this._markerGroup);
-    this._updateMoveMarker();
-    this._fireEdit();
+      // show resize marker
+      this._shape._map.addLayer(this._markerGroup);
+      this._updateMoveMarker();
+      this._fireEdit();
+    }
   }
 });
